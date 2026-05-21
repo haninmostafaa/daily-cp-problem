@@ -2,39 +2,52 @@ name: Daily CF Problem
 
 on:
   schedule:
-    - cron: '0 16 * * *' # بيشتغل لوحده كل يوم الساعة 6 مساءً بتوقيت مصر
+    - cron: '0 16 * * *' # كل يوم الساعة 6 مساءً بتوقيت مصر
   workflow_dispatch: # الزرار السحري للتجربة فوراً!
 
 jobs:
   send_problem:
     runs-on: ubuntu-latest
     steps:
-      - name: Get Problem and Send to Telegram
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Requests
+        run: pip install requests
+
+      - name: Fetch and Send Problem
         run: |
-          # 1. نجيب المسائل من كود فورسيز ونختار واحدة عشوائية ريتنج 800-1100
-          PROBLEM_DATA=$(curl -s "https://codeforces.com/api/problemset.problems")
-          
-          # فلترة واختيار مسألة عشوائية باستخدام جافا سكريبت سريعة في الخلفية
-          CHOSEN_PROB=$(echo '$PROBLEM_DATA' | node -e "
-            const fs = require('fs');
-            const data = JSON.parse(fs.readFileSync(0, 'utf-8'));
-            const problems = data.result.problems.filter(p => p.rating && p.rating >= 800 && p.rating <= 1100);
-            const randomProb = problems[Math.floor(Math.random() * problems.length)];
-            console.log(JSON.stringify(randomProb));
-          ")
-          
-          NAME=$(echo "$CHOSEN_PROB" | node -e "console.log(JSON.parse(fs.readFileSync(0, 'utf-8')).name)")
-          RATING=$(echo "$CHOSEN_PROB" | node -e "console.log(JSON.parse(fs.readFileSync(0, 'utf-8')).rating)")
-          CONTEST_ID=$(echo "$CHOSEN_PROB" | node -e "console.log(JSON.parse(fs.readFileSync(0, 'utf-8')).contestId)")
-          INDEX=$(echo "$CHOSEN_PROB" | node -e "console.log(JSON.parse(fs.readFileSync(0, 'utf-8')).index)")
-          
-          LINK="https://codeforces.com/problemset/problem/\${CONTEST_ID}/\${INDEX}"
-          
-          # 2. نص الرسالة اللي هتوصلك
-          MSG="⏰ حان وقت التحدي اليومي يا حنين! مفيش كسل اليوم 🚀%0A%0A📌 *${NAME}*%0A⭐ Rating: ${RATING}%0A%0A🔗 ${LINK}"
-          
-          # 3. جيت هاب يبعتها لتليجرام مباشرة بدون وسيط
-          curl -s -X POST "https://api.telegram.org/bot8906862062:AAE4_xCSVjnqKZbjO9r1Oa6k6NORsntIDYI/sendMessage" \
-            -d "chat_id=6047908521" \
-            -d "text=${MSG}" \
-            -d "parse_mode=Markdown"
+          python -c "
+          import requests
+          import random
+
+          # 1. نجيب المسائل من Codeforces
+          try:
+              cf_url = 'https://codeforces.com/api/problemset.problems'
+              data = requests.get(cf_url).json()
+              problems = data['result']['problems']
+              
+              # فلترة المسائل من ريتنج 800 لـ 1100
+              filtered = [p for p in problems if 'rating' in p and 800 <= p['rating'] <= 1100]
+              
+              if filtered:
+                  p = random.choice(filtered)
+                  link = f'https://codeforces.com/problemset/problem/{p[\"contestId\"]}/{p[\"index\"]}'
+                  msg = f'⏰ حان وقت التحدي اليومي يا حنين! مفيش كسل اليوم 🚀\n\n📌 *{p[\"name\"]}*\n⭐ Rating: {p[\"rating\"]}\n\n🔗 {link}'
+                  
+                  # 2. نبعت لتليجرام مباشرة
+                  tele_url = 'https://api.telegram.org/bot8906862062:AAE4_xCSVjnqKZbjO9r1Oa6k6NORsntIDYI/sendMessage'
+                  payload = {
+                      'chat_id': '6047908521',
+                      'text': msg,
+                      'parse_mode': 'Markdown'
+                  }
+                  res = requests.post(tele_url, data=payload)
+                  print('Telegram response:', res.status_code)
+              else:
+                  print('No problems found in this rating range.')
+          except Exception as e:
+              print('Error:', e)
+          "
