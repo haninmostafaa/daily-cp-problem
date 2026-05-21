@@ -2,13 +2,39 @@ name: Daily CF Problem
 
 on:
   schedule:
-    - cron: '0 16 * * *' # هيشتغل لوحده كل يوم الساعة 6 مساءً بتوقيت مصر
-  workflow_dispatch: # زرار لتشغيل البوت يدوياً في أي وقت!
+    - cron: '0 16 * * *' # بيشتغل لوحده كل يوم الساعة 6 مساءً بتوقيت مصر
+  workflow_dispatch: # الزرار السحري للتجربة فوراً!
 
 jobs:
-  ping_bot:
+  send_problem:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Daily Problem
+      - name: Get Problem and Send to Telegram
         run: |
-          curl -X POST https://haninMostafa.pythonanywhere.com/trigger-daily
+          # 1. نجيب المسائل من كود فورسيز ونختار واحدة عشوائية ريتنج 800-1100
+          PROBLEM_DATA=$(curl -s "https://codeforces.com/api/problemset.problems")
+          
+          # فلترة واختيار مسألة عشوائية باستخدام جافا سكريبت سريعة في الخلفية
+          CHOSEN_PROB=$(echo '$PROBLEM_DATA' | node -e "
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync(0, 'utf-8'));
+            const problems = data.result.problems.filter(p => p.rating && p.rating >= 800 && p.rating <= 1100);
+            const randomProb = problems[Math.floor(Math.random() * problems.length)];
+            console.log(JSON.stringify(randomProb));
+          ")
+          
+          NAME=$(echo "$CHOSEN_PROB" | node -e "console.log(JSON.parse(fs.readFileSync(0, 'utf-8')).name)")
+          RATING=$(echo "$CHOSEN_PROB" | node -e "console.log(JSON.parse(fs.readFileSync(0, 'utf-8')).rating)")
+          CONTEST_ID=$(echo "$CHOSEN_PROB" | node -e "console.log(JSON.parse(fs.readFileSync(0, 'utf-8')).contestId)")
+          INDEX=$(echo "$CHOSEN_PROB" | node -e "console.log(JSON.parse(fs.readFileSync(0, 'utf-8')).index)")
+          
+          LINK="https://codeforces.com/problemset/problem/\${CONTEST_ID}/\${INDEX}"
+          
+          # 2. نص الرسالة اللي هتوصلك
+          MSG="⏰ حان وقت التحدي اليومي يا حنين! مفيش كسل اليوم 🚀%0A%0A📌 *${NAME}*%0A⭐ Rating: ${RATING}%0A%0A🔗 ${LINK}"
+          
+          # 3. جيت هاب يبعتها لتليجرام مباشرة بدون وسيط
+          curl -s -X POST "https://api.telegram.org/bot8906862062:AAE4_xCSVjnqKZbjO9r1Oa6k6NORsntIDYI/sendMessage" \
+            -d "chat_id=6047908521" \
+            -d "text=${MSG}" \
+            -d "parse_mode=Markdown"
