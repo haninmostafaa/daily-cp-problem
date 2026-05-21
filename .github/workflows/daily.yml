@@ -1,0 +1,14 @@
+name: Daily CF Problem
+
+on:
+  schedule:
+    - cron: '0 16 * * *' # هيشتغل لوحده كل يوم الساعة 6 مساءً بتوقيت مصر
+  workflow_dispatch: # زرار لتشغيل البوت يدوياً في أي وقت!
+
+jobs:
+  ping_bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Daily Problem
+        run: |
+          curl -X POST https://haninMostafa.pythonanywhere.com/trigger-daily
